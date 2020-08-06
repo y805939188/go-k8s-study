@@ -216,6 +216,6 @@ return errors.Wrap(mgr.Start(ctrl.SetupSignalHandler()), "can not start controll
 11. 这个方法中，主要逻辑就是启动 Cache 以及 Controller
 12. 启动 Cache 的话，是去找第2步中的那个 informerMap，
 然后把每一个 informer 都run起来，run起来就算是真正开始和 Api Server 建立 List Watch 链接开始监听该 Kind 的 GVK 了
-13. 每当 Api Server 给发送资源改变的消息之后，会触发对应的第7步中的 handler，handler 中一共有 delete，create，update 三个方法，但是这三种方法干的事儿都是一样的，就是单纯地将对应的资源的 name 和所在的 namespace 放入 queue中（具体到底是 CUR 哪个操作需要在 Reconcile 中自己判断）
+13. 每当 Api Server 给发送资源改变的消息之后，会触发对应的第9步中的 handler，handler 中一共有 delete，create，update 三个方法，但是这三种方法干的事儿都是一样的，就是单纯地将对应的资源的 name 和所在的 namespace 放入 queue中（具体到底是 CUR 哪个操作需要在 Reconcile 中自己判断）
 14. 最后启动 Controller，Controller 中会启动一个 goroutine 的协程不停地查询 queue，如果 queue 中还有东西的话，就 Get 出来，然后会调用该 controller 上的 Do(第5步) 上的 Reconcile 方法，这个方法就是真正自己定义的那个 Reconcile
 15. 注意，每个 CRD 都有自己的一个 controller，因为在注册每个 CRD 的时候都会调用 complete 方法，doController 就是在这个 complete 中初始化的
