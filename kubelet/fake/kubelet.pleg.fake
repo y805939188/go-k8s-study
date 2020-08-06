@@ -1,0 +1,68 @@
+
+1.解析命令行参数，然后创建kubeletFlag，就是/etc/systemd/system/kubelet.service中的
+2.生成kubeletConfig，就是kubelet.service的config对应的目录中的配置
+3.根据上边那俩创建一个kubeletServer大的结构体
+4.根据kubeletServer初始化一个kubeletDeps也就是初始化一个kubelet的依赖相关的结构体
+这个结构体里除了把刚才的kubeletServer里的config和flag给放进去之外，还有一些其他的比如VolumePlugins，HeartbeatClient，KubeClient，DockerOptions等 kubelet 运行所必须的配置
+5.之后初始化KubeClient(可以访问集群中所有的原生资源，如pods、deployment等，e.g.：clientset.CoreV1().Pods("").List(v12.ListOptions{}))，EventClient，HeartbeatClient
+6.初始化cadvisor
+7.调用RunKubelet(
+  会根据config，flag，deps，以及其他一些node的信息比如nodename,
+  hostname等调用createAndInitKubelet, 以创建一个Kubelet对象
+)
+  7-1.初始化 PodConfig 即监听 pod 元数据的来源(file，http，apiserver)，将不同 source 的 pod configuration 合并到一个结构中
+  7-2.顺带着初始化一些containerGC，imageGC的配置相关
+  7-3.启动 serviceInformer 和 nodeInformer；
+  7-4.初始化 containerRefManager、oomWatcher；
+  7-5.初始化 kubelet 对象
+  7-6.初始化 secretManager、configMapManager；
+  7-7.初始化 livenessManager、podManager、statusManager、resourceAnalyzer；
+  7-8.调用 kuberuntime.NewKubeGenericRuntimeManager 初始化 containerRuntime；
+  7-9.初始化 pleg
+  7-10.初始化 containerGC、containerDeletor、imageManager、containerLogManager；
+  7-11.初始化 serverCertificateManager、probeManager、tokenManager、volumePluginMgr、pluginManager、volumeManager
+  7-12.初始化 workQueue、podWorkers、evictionManager
+  7-13.最后注册相关模块的 handler
+8.startKubelet 启动kubelet服务,主要就是把kubelet对象中的所有模块以及依赖启动起来
+  8-0.调用 kl.initializeModules 首先启动不依赖 container runtime 的一些模块；
+  8-1.启动 volume manager
+  8-2.执行 kl.syncNodeStatus 定时同步 Node 状态；
+  8-3.调用 kl.fastStatusUpdateOnce 更新容器运行时启动时间以及执行首次状态同步；
+  8-4.判断是否启用 NodeLease 机制；
+  8-5.执行 kl.updateRuntimeUp 定时更新 Runtime 状态；
+  8-6.执行 kl.syncNetworkUtil 定时同步 iptables 规则；
+  8-7.执行 kl.podKiller 定时清理异常 pod，当 pod 没有被 podworker 正确处理的时候，启动一个goroutine 负责 kill 掉 pod；
+  8-8.启动 statusManager；
+  8-9.启动 probeManager；
+  8-10.启动 runtimeClassManager；
+  8-11.启动 pleg；
+  8-12.调用 kl.syncLoop 监听 pod 变化；
+9.向api server发送一个event，告诉apiserver某某node节点启动了kubelet
+10.启动垃圾回收
+11.
+
+
+cgroup: Linux内核的一个功能，用来限制，控制与分离一个进程组群的资源（如CPU、内存、磁盘输入输出等）
+cgroupManager根据pod的Qos设置不同级别的cgroup参数，并不断根据pod的变化维护这些cgroup参数
+  qos 级别
+    Guaranteed【老板（我要的都是我的）】：pod 里每个容器都必须设定 request 和 limit，并且值必须相同
+    Burstable 【洗碗工（底薪+提成）】：pod 里至少有一个容器的 cpu 或者 memory 设置了 request 值
+    BestEffort【切格瓦拉（能偷到的都是我的）】：POD 的所有容器都没有指定CPU和内存的 request 和 limit
+
+
+
+
+PLEG = NewGenericPLEG(klet.containerRuntime)
+
+// containerRuntime 是容器的运行时，封装了一些对底层docker或者其他容器技术的接口的调用
+func NewGenericPLEG(containerRuntime) {
+  return {
+    //...
+    runtime: containerRuntime,
+    podRecords: {},
+    eventChannel: channel
+    //...
+  }
+}
+
+

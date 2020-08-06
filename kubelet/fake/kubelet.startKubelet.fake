@@ -1,0 +1,78 @@
+func startKubelet(kubelet, PodConfig) {
+  Run(kubelet, PodConfig)
+}
+
+func Run(kubelet, PodConfig) {
+  // 会开启很多的协程Run起来一些kubelet的依赖
+  // 比如volumeManager
+  Coroutine: volumeManager.Run(interval, NeverStop)
+
+  if (kubelet.kubeletClient) {
+    // 用来向api server上报node状态的
+    Coroutine: wait.Until(syncNodeStatus, nodeStatusUpdateFrequency, NeverStop)
+  }
+  
+  // 启动statusManager模块
+  // 作用是将pod的状态信息同步到api server
+  kubelet.statusManager.Start()
+  // 启动probeManager模块
+  kubelet.probeManager.Start()
+  // 启动pod lifecycle event generator模块
+  kubelet.pleg.Start()
+  // 启动syncLoop 监听pod的变化
+  kubelet.syncLoop(PodConfig.updates, kl)
+}
+
+func syncLoop(updatesChannel, kl) {
+
+	plegCh = kl.pleg.Watch()
+	base   = 100 * time.Millisecond
+	duration = base
+
+	for {
+		time.Sleep(duration)
+		kubelet.syncLoopIteration(kl, updatesChannel, plegChannel, ...)
+	}
+}
+
+func syncLoopIteration(
+	handler Kubelet, // handler就是Kubelet那个大对象
+	configCh <-chan kubetypes.PodUpdate,
+	plegCh <-chan *pleg.PodLifecycleEvent,
+	//......还有一些其他类型的channel要在这个函数里进行handle	
+) {
+  select {
+    case u = <-configCh {
+			switch u.Op {
+				case kubetypes.ADD:
+					handler.HandlePodAdditions(u.Pods)
+				case kubetypes.UPDATE:
+					handler.HandlePodUpdates(u.Pods)
+				case kubetypes.REMOVE:
+					handler.HandlePodRemoves(u.Pods)
+				case kubetypes.RECONCILE:
+					handler.HandlePodReconcile(u.Pods)
+				case kubetypes.DELETE:
+					handler.HandlePodUpdates(u.Pods)
+				case kubetypes.RESTORE:
+					handler.HandlePodAdditions(u.Pods)
+			}
+		}
+	}
+	// ... 还要处理一些其他的事件比如plegChannel里的等等
+}
+
+func HandlePodAdditions(pods) {
+	for pod = range pods {
+		kl.podManager.AddPod(pod)
+		// ...这里还要处理静态pod
+		kl.dispatchWork(pod)
+	}
+}
+
+func dispatchWork(pod) {
+	kl.podWorkers.UpdatePod(&UpdatePodOptions{
+		Pod: pod,
+		// 还有一些其他参数
+	})
+}

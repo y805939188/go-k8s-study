@@ -1,0 +1,104 @@
+func makePodSourceConfig() {
+	// podConfig := &PodConfig{
+	//  	pods:    storage, // pods们的缓存，初始是空
+	//  	mux:     config.NewMux(), // 一个xxx
+	//  	updates: updates, // 一个channel
+	//  	sources: sets.String{}, // { "api-server": [], "http": [] , "file": []}
+	// }
+  cfg = NewPodConfig()
+
+	// 中间这里还会初始化一些static pod相关的东西
+
+	var updatechannel chan<- interface{}
+	updatechannel = Channel("api-server")
+	NewSourceApiserver(nodeName, updatechannel)
+}
+
+func NewSourceApiserver(nodeName, updates) {
+	lw = NewListWatchFromClient("pods", metav1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
+	newSourceApiserverFromLW(lw, updates)
+}
+
+func newSourceApiserverFromLW(lw, updates) {
+	send = func(objs) {
+		var pods // pod类型的list
+		for pod = range objs {
+			pods = append(pods, pod)
+		}
+		updates <- {Pods: pods, Op: kubetypes.SET, Source: "api-server"}
+	}
+	Coroutine: startWatch(lw, send)
+}
+
+
+func Channel(source) {
+	mux.Channel(source)
+}
+
+mux: Channel(source) { // "api-server"
+	channel = podConfig.sources[source]
+	newChannel := make(chan interface{})
+	podConfig.sources[source] = newChannel
+	Coroutine: wait.Until(func() { listen(source, newChannel) }, NeverStop)
+}
+
+func listen(source, listenChannel <-chan interface{}) {
+	for update = range listenChannel {
+		mux.Merge(source, update)
+	}
+}
+
+mux: func Merge(source string, change interface{}) {
+	adds, updates, deletes, removes, reconciles = merge(source, change)
+
+	if len(removes.Pods) > 0 {
+		podConfig.updates <- *removes
+	}
+	if len(adds.Pods) > 0 {
+		podConfig.updates <- *adds
+	}
+	if len(updates.Pods) > 0 {
+		podConfig.updates <- *updates
+	}
+	if len(deletes.Pods) > 0 {
+		podConfig.updates <- *deletes
+	}
+}
+
+// {Pods: pods, Op: kubetypes.SET, Source: "api-server"}
+func merge(source string, change interface{}) {
+	addPods = []*v1.Pod{}
+	updatePods = []*v1.Pod{}
+	deletePods = []*v1.Pod{}
+	removePods = []*v1.Pod{}
+	reconcilePods = []*v1.Pod{}
+
+	pods = podStorage.pods[source]
+	if (!pods) {
+		pods = make(map[types.UID]*v1.Pod)
+	}
+
+	switch update.Op {
+		case kubetypes.SET:
+			oldPods = pods
+			pods = make(map[types.UID]*v1.Pod)
+			// 用新旧pods做diff
+			// 找到新的pods放进addPods列表
+			updatePodsFunc(update.Pods, oldPods, pods)
+			for oldPod = range oldPods {
+				if !(pods[oldPod.uid]) {
+					removePods = append(removePods, oldPod)
+				}
+			}
+		}
+
+	podStorage.pods[source] = pods
+
+	adds = &kubetypes.PodUpdate{Op: kubetypes.ADD, Pods: copyPods(addPods), Source: source}
+	updates = &kubetypes.PodUpdate{Op: kubetypes.UPDATE, Pods: copyPods(updatePods), Source: source}
+	deletes = &kubetypes.PodUpdate{Op: kubetypes.DELETE, Pods: copyPods(deletePods), Source: source}
+	removes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Pods: copyPods(removePods), Source: source}
+	reconciles = &kubetypes.PodUpdate{Op: kubetypes.RECONCILE, Pods: copyPods(reconcilePods), Source: source}
+
+	return adds, updates, deletes, removes, reconciles
+}

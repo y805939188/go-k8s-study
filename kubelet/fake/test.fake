@@ -1,0 +1,3 @@
+1. kubelet在启动的过程中会和api server建立一条http的list-watch连接
+2. 通过该连接，kubelet能够实时接收到pod发生的变化
+3. 然后

@@ -1,0 +1,35 @@
+StartProcess()
+
+func StartProcess(){
+  // etc/systemd/system/kubelet.service
+  kubeletFlag = createKubeletFlag(command)
+  // etc/systemd/system/kubelet.service#config=xxxx
+  kubeletConfig = createKubeletConfig(kubeletFlag.configFilePath)
+
+  kubeletServer = createKubeletServer(kubeletFlag, kubeletConfig)
+
+  // 根据kubeletServer初始化一个kubeletDeps也就是初始化一个kubelet的依赖相关的对象
+  // 除了把flag和config放进去，还给添加了一些其他的模块
+  // KubeClient，HeartbeatClient，DockerOptions等
+  // kubelet 运行所必须KubeClient、EventClient、HeartbeatClient、cadvisor、ContainerManager
+  kubeletDeps = createKubeletDeps(kubeletServer)
+
+  Run(kubeletServer, kubeletDeps)
+
+}
+
+func Run(kubeletServer, kubeletDeps) {
+  // 初始化 kubeDeps 中包含的一些依赖项 KubeClient、HeartbeatClient、cadvisor、ContainerManager
+  initKubeDeps()
+  RunKubelet(kubeletServer, kubeletDeps)
+}
+
+func RunKubelet(kubeletServer, kubeletDeps) {
+  k = createAndInitKubelet(
+    // 这里会传一大堆的参数
+    // 主要来自于kubeletServer 和 kubeletDeps
+    // 以及其他的参数比如hostname，nodename等
+  )
+  startKubelet(k, kubeletDeps.PodConfig)
+}
+

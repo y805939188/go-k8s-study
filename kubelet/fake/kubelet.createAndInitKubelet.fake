@@ -1,0 +1,9 @@
+func createAndInitKubelet(...params) {
+  // 这里会去创建一个Kubelet的大对象
+  k = NewMainKubelet(...params)
+  // 往api server发一条消息，告诉apiserver 该node启动了kubelet
+  k.BirthCry()
+  // 启动垃圾回收
+  k.StartGarbageCollection()
+  return k
+}

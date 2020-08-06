@@ -1,0 +1,57 @@
+// 首先会在NewMainKubelet中进行初始化
+func NewMainKubelet(){
+  // ...
+
+  klet.pleg = NewGenericPLEG()     
+
+  // ...
+}
+
+func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
+	return {
+		relistPeriod, // 1s
+		runtime, // container runtime
+		eventChannel, // 一个管道 
+		podRecords, // { [pid]: { old, current } }
+	}
+}
+
+func Start() {
+  Coroutine wait.Until(relist, pleg.relistPeriod, NeverStop)
+}
+
+func relist() {
+  podList = pleg.runtime.GetPods(true)
+  pleg.podRecords.setCurrent(pods)
+
+  // 
+  eventsByPodID = [] // 每一项是 { [uid]: PodLifecycleEvent }
+  // "ContainerStarted"
+	// "ContainerDied"
+  // "ContainerRemoved"
+  // "PodSync"
+	// "ContainerChanged"
+
+  for pid = range pleg.podRecords {
+    oldPod = pleg.podRecords.getOld(pid)
+    pod = pleg.podRecords.getCurrent(pid)
+
+    allContainers = getContainersFromPods(oldPod, pod)
+    for container = range allContainers {
+      // 根据pid遍历所有容器中的pod
+      event = computeEvents(oldPod, pod, container.ID)
+      if (!event) continue
+      // 如果有event说明该pod发生了改变
+      // 就把这个pod的id和对应的event放到eventsByPodID里头
+      updateEvents(eventsByPodID, event)
+    }
+  }
+
+  for pid, event = range eventsByPodID {
+    pod = pleg.podRecords.getCurrent(pid)
+    
+    g.podRecords.update(pid)
+    pleg.eventChannel <- event
+  }
+}
+

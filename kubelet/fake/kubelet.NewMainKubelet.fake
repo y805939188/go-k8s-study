@@ -1,0 +1,62 @@
+func NewMainKubelet(
+  //...这里会接收一大堆的参数
+  // 比如: 
+  kubeDeps,
+	Options,
+  // 用containerRuntime对底层那些docker等提供的interface进行了封装
+  // 比如containerRuntime直接提供了GetPods、KillPod等api
+	containerRuntime,
+	hostname,
+	nodeName,
+	nodeIP,
+  // 等等...
+) {
+  // 初始化podConfig
+  // pod的来源有三个，1文件路径，2http，3apiserver
+  // 这三个会被放进同一个对象中
+  // 然后对三种方式，创建不同的监听方式
+  // 对于ApiServer而言，是创建了一个 ListWatch机制去监听api server上的pod的变化
+  kubeDeps.PodConfig = makePodSourceConfig()
+  // 然后初始化了一些GC相关
+  ContainerGCPolicyInit()
+  ImageGCPolicyInit()
+
+  // 初始化OOM
+  oomWatcher := oomwatcher.NewWatcher(kubeDeps.Recorder)
+
+  // 初始化Kubelet
+  // 把config，一些node的环境信息，deps还有一些kubelet需要的模块比如pleg等塞给这个对象
+  // 也就是说 klet 这个对象包含了必要的配置信息，client(KubeClient等)，还有各种manager
+  // manager比如: 
+  // podManager：管理pod的生命周期，包括对pod的增删改查操作等。
+  // statusManager：与apiserver同步pod状态
+  // volumeManager：对pod的volume进行挂载卸载等操作
+  // containerGC：对挂掉的容器进行GC
+  // probeManager：探针管理
+  // 等......
+  klet = new Kubelet(...)
+
+  // 初始化一些manager
+  initLivenessManager()
+  initPodManager()
+  initStatusManager()
+
+  // 初始haulcontainerRuntime
+  initContainerRuntime()
+
+  // 初始化 Pod Lifecycle Event Generator
+  initPleg()
+
+  // 再初始化一堆乱七八糟的
+  initImageManager()
+  initProbeManager()
+  initVolumeManager()
+
+  // 初始化podWorker
+  klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+  initEvictionManager()
+
+  // 其他......
+
+  return klet
+}

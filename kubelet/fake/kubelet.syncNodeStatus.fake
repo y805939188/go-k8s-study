@@ -1,0 +1,26 @@
+func syncNodeStatus(kl) {
+	if (!kl) return
+
+	updateNodeStatus(kl)
+}
+
+func updateNodeStatus(kl) {
+	for (i = 0; i < kl.nodeStatusUpdateRetry; i++) {
+    try {
+      tryUpdateNodeStatus(i, kl)
+      return
+    } catch (err) {
+
+    }
+	}
+  log.Error("错误")
+}
+
+func tryUpdateNodeStatus(tryNumber, kl) {
+
+	prevNode = kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName))
+
+	currentNode = kl.setNodeStatus()
+
+	util.PatchNodeStatus(kl.nodeName, prevNode, currentNode)
+}

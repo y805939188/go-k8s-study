@@ -1,0 +1,107 @@
+// syncPodFn: syncPod
+func newPodWorkers(syncPodFn syncPodFnType, //...还有一些其他参数) {
+	return &podWorkers{
+    // ...
+		syncPodFn:  syncPodFn,
+    // &UpdatePodOptions{
+    //  Pod: pod,
+    //  // 还有一些其他参数
+    // }
+    podUpdates map[types.UID]chan UpdatePodOptions
+    // ...
+	}
+}
+
+// {
+//   Pod: pod,
+//   // 还有一些其他参数
+// }
+func UpdatePod(options) {
+	pod = options.Pod
+	uid = pod.UID
+	var podUpdates chan UpdatePodOptions
+
+	if !(podWorkers.podUpdates[uid]) {
+		podUpdates = make(chan UpdatePodOptions)
+    podUpdates <- options
+		podWorkers.podUpdates[uid] = podUpdates
+    Coroutine: podWorkers.managePodLoop(podUpdates)
+	}
+}
+
+func managePodLoop(podUpdates <-chan UpdatePodOptions) {
+  for update = range podUpdates {
+    podWorkers.syncPodFn(syncPodOptions{
+      // ...params
+      pod:            update.Pod,
+      podStatus:      status,
+      // ...params
+    })
+  }
+}
+
+func syncPod(o syncPodOptions) {
+    pod = o.pod
+    
+    // 创建一个podStatus对象
+    // 上面有什么PodIP、hostip、StartTime、InitContainerStatuses、ContainerStatuses等信息
+    apiPodStatus := kubelet.generateAPIPodStatus(pod)
+
+    // Create Cgroups for the pod and apply resource parameters
+    // to them if cgroups-per-qos flag is enabled.
+    pcm = kubelet.containerManager.NewPodContainerManager()
+
+    // os.MkdirAll(getPodDir(uid), 0750)
+    // os.MkdirAll(kl.getPodVolumesDir(uid), 0750)
+    // os.MkdirAll(kl.getPodPluginsDir(uid), 0750)
+    kubelet.makePodDataDirs(pod)
+
+    // 调用CRI创建Pod
+    // ContainerRuntime:
+    //  RemoveContainers(containers []string) error
+    //  PullImage(image string) error
+    //  ImageExists(image string) (bool, error)
+    //  等等......
+    result = kubelet.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, ...)
+}
+
+func SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, ...) {
+  // computePodActions检查pod的spec是否已更改,还有Container, initContainer
+  // 等的状态, 根据这些信息决定是否restart整个pod
+  // podContainerChanges就是这么个对象
+  // changes := podActions{
+  //   KillPod:           createPodSandbox,
+  //   CreateSandbox:     createPodSandbox,
+  //   SandboxID:         sandboxID,
+  //   Attempt:           attempt,
+  //   ContainersToStart: []int{},
+  //   ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
+  // }
+  // 遍历Pod内所有Containers 如果container还没启动的话就把它加入到ContainersToStart
+  // 如果Spec发生改变, 也会将Container加入到ContainersToStart
+  // 如果Spec没变, 存活探针也是成功的, 就保持不动
+  // 其他情况就把Container加入到ContainersToKill中
+  podContainerChanges := m.computePodActions(pod, podStatus)
+  // 所以computePodActions主要作用就是计算出待启动和待杀的container们
+  
+  for containerID = range podContainerChanges.ContainersToKill {
+    killContainer(pod, containerID)
+  }
+  
+  if (hasInitContainers) {
+    startContainer(container, pod, podStatus, podIP, kubecontainer.ContainerTypeInit)
+  }
+  
+  for idx = range podContainerChanges.ContainersToStart {
+    container := &pod.Spec.Containers[idx]
+    startContainer()
+  }
+}
+
+func startContainer() {
+  imageManager.EnsureImageExists()   
+  
+  ContainerManager.CreateContainer()
+  
+  ContainerManager.StartContainer()
+}
