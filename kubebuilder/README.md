@@ -112,10 +112,110 @@ controllers 目录下是 自定义的 Kind 的 controller
 
 ## 启动自定义 CRD 以及 Controller 的大概流程
 1. 首先入口处 NewManager, NewManager 内部大概就是 NewClient 以及 NewCache
-2. 其中 NewCache 大概就是 new 了一个 informer 的map，然后这个 map 以每个Kind，也就是每个 GVK 为 key，value 是它对应的 informer，每个 informer 都会创建一条 List Watch 和 Api Server 通信，监听对应的 Kind(GVK)
+```go
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{SyncPeriod: &options.SyncPeriod, MetricsBindAddress: options.MetricsAddr})
+```
+2. 其中 NewCache 大概就是 new 了一个 informer 的 map，然后这个 map 以每个Kind，也就是每个 GVK 为 key，value 是它对应的 informer，每个 informer 都会创建一条 List Watch 和 Api Server 通信，监听对应的 Kind(GVK)
 3. NewClient 就是创建了一个用于和 Api Server 通信的客户端，其中读操作直接去 Cache 中去读，写的话会间接调用 k8s 提供的 go-client
-4. 在 ctrl.NewControllerManagedBy 之后总会调用 complete 方法
-5. complete 方法表示程序初始化完成已经开始监听资源了
-6. 内部大概逻辑是，doController 方法，初始化一个 Controller，
+4. 然后把自定义的 CRD 注册给scheme
+先:
+```go
+  // groupversion_info.go 下
+  var (
+    GroupVersion = schema.GroupVersion{Group: GROUP, Version: VERSION}
+  )
+```
+然后:
+```go
+  // 可以在同一个package下调用它的 Register
+  SchemeBuilder.Register(&ServerWorkload{}, &ServerWorkloadList{})
+	SchemeBuilder.Register(&TaskWorkload{}, &TaskWorkloadList{})
+  // ......其他 CRD
+```
+再:
+```go
+  // 引入 SchemeBuilder 所在的那个 package
+  import alpha666 "xxxxxx/yyyyyy/xxxxx"
+  // 以及 client-go 提供的 schema，也就是哪些 build-in 的资源类型
+  buildInScheme "k8s.io/client-go/kubernetes/scheme"
+  scheme = runtime.NewScheme()
+  _ = buildInScheme.AddToScheme(scheme)
+	_ = alpha666.AddToScheme(scheme)
+
+------------------------------------------------------------------
+
+  // or:
+  import (
+    // 引入 runtime
+    "k8s.io/apimachinery/pkg/runtime"
+    // 引入 SchemeBuilder 所在的那个 package
+    v1alpha1666 "xxxxxx/yyyyyy/xxxxx"
+  )
+  AddToSchemes = append(runtime.SchemeBuilder, v1alpha1666.SchemeBuilder.AddToScheme)
+  
+  mgr, err := ctrl.NewManager(cfg, ctrl.Options{SyncPeriod: &options.SyncPeriod, MetricsBindAddress: options.MetricsAddr})
+
+  s := mgr.GetScheme()
+  AddToSchemes.AddToScheme(s)
+```
+5. 直到调用完 AddToScheme 才算是这个 CRD(CRDS) 被注册完事儿
+6. 之后需要需要对所有的 CRD 进行Setup
+```go
+func Setup(mgr ctrl.Manager, l logr.Logger) error {
+	for _, setup := range []func(ctrl.Manager, logr.Logger) error{
+    // ...
+    corecontroller.ServerSetup,
+    // ...
+	} {
+		if err := setup(mgr, l); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+```
+```go
+// 可以和 Reconcile 定义在一起
+func ServerSetup(mgr ctrl.Manager, l logr.Logger) error {
+	// ...
+	return ctrl.NewControllerManagedBy(mgr).
+		Named(name).
+		For(&corev1alpha2.ServerWorkload{}).
+		Complete(NewServerWorkloadReconciler(mgr,
+			sagecore.WithLogger(l.WithValues("controller", name)),
+			sagecore.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name)))))
+}
+```
+```go
+func NewServerWorkloadReconciler(m ctrl.Manager, o ...sagecore.ReconcilerOption) *ServerWorkloadReconciler {
+	sr := &ServerWorkloadReconciler{}
+	sr.Client = m.GetClient()
+	sr.Scheme = m.GetScheme()
+	sr.WorkloadRender = sagerender.SageRender{}
+  sr.Record = event.NewNopRecorder()
+	proxy := &sageproxy.ApplicatorProxy{
+		Client: m.GetClient(),
+		Scheme: m.GetScheme(),
+		Log:    sr.Log,
+	}
+	sr.Proxy = proxy
+  // 还可以处理一些GC 相关
+	return sr
+}
+
+```
+7. 在 ctrl.NewControllerManagedBy 之后总会调用 complete 方法
+8. complete 内部大概逻辑是，doController 方法，初始化一个 Controller，
 这个 Controller 有 Cache 负责注册 Watch，Client 负责Kind 的 CUD 没有R，Queue 负责对 Watch 到的资源的事件做缓存，Recorder 负责事件收集，还有重要的 Do 这个就是自己写的那个 Reconcile 方法。
-7. 
+9. 之后内部还会触发一个 doWatch 方法，该方法里头初始化了一个 handler，然后调用上面初始化的 Controller 的 Watch 方法，但是
+这个 Watch 不是真的开始监听，而是先初始化该类型的 CRD 的 Watch，包括把 handler，src源，queue 等传进去
+10. complete 到这儿基本就算是完事儿了，之后调用 manager.Start 方法
+```go
+return errors.Wrap(mgr.Start(ctrl.SetupSignalHandler()), "can not start controllers")
+```
+11. 这个方法中，主要逻辑就是启动 Cache 以及 Controller
+12. 启动 Cache 的话，是去找第2步中的那个 informerMap，
+然后把每一个 informer 都run起来，run起来就算是真正开始和 Api Server 建立 List Watch 链接开始监听该 Kind 的 GVK 了
+13. 每当 Api Server 给发送资源改变的消息之后，会触发对应的第7步中的 handler，handler 中一共有 delete，create，update 三个方法，但是这三种方法干的事儿都是一样的，就是单纯地将对应的资源的 name 和所在的 namespace 放入 queue中（具体到底是 CUR 哪个操作需要在 Reconcile 中自己判断）
+14. 最后启动 Controller，Controller 中会启动一个 goroutine 的协程不停地查询 queue，如果 queue 中还有东西的话，就 Get 出来，然后会调用该 controller 上的 Do(第5步) 上的 Reconcile 方法，这个方法就是真正自己定义的那个 Reconcile
+15. 注意，每个 CRD 都有自己的一个 controller，因为在注册每个 CRD 的时候都会调用 complete 方法，doController 就是在这个 complete 中初始化的
