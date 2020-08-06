@@ -117,7 +117,7 @@ controllers 目录下是 自定义的 Kind 的 controller
 ```
 2. 其中 NewCache 大概就是 new 了一个 informer 的 map，然后这个 map 以每个Kind，也就是每个 GVK 为 key，value 是它对应的 informer，每个 informer 都会创建一条 List Watch 和 Api Server 通信，监听对应的 Kind(GVK)
 3. NewClient 就是创建了一个用于和 Api Server 通信的客户端，其中读操作直接去 Cache 中去读，写的话会间接调用 k8s 提供的 go-client
-4. 然后把自定义的 CRD 注册给scheme
+4. 然后把自定义的 CRD 注册给scheme</br>
 先:
 ```go
   // groupversion_info.go 下
