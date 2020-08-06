@@ -1,0 +1,10 @@
+domain: ding.test.com
+repo: gogogogogo
+resources:
+- group: ding.shin.com
+  kind: DingShinType
+  version: v1alpha666
+- group: ding.shin.com
+  kind: DingShin888Type
+  version: v1alpha666
+version: "2"

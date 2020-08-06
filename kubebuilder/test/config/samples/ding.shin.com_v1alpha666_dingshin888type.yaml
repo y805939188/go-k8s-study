@@ -1,0 +1,7 @@
+apiVersion: ding.shin.com.ding.test.com/v1alpha666
+kind: DingShin888Type
+metadata:
+  name: dingshin888type-sample
+spec:
+  # Add fields here
+  foo: bar

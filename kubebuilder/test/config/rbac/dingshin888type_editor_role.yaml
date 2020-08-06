@@ -1,0 +1,24 @@
+# permissions for end users to edit dingshin888types.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dingshin888type-editor-role
+rules:
+- apiGroups:
+  - ding.shin.com.ding.test.com
+  resources:
+  - dingshin888types
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ding.shin.com.ding.test.com
+  resources:
+  - dingshin888types/status
+  verbs:
+  - get

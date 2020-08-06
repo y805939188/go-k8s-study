@@ -1,0 +1,20 @@
+# permissions for end users to view dingshintypes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dingshintype-viewer-role
+rules:
+- apiGroups:
+  - ding.shin.com.ding.test.com
+  resources:
+  - dingshintypes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ding.shin.com.ding.test.com
+  resources:
+  - dingshintypes/status
+  verbs:
+  - get
