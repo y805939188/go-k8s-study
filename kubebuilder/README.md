@@ -110,3 +110,12 @@ controllers 目录下是 自定义的 Kind 的 controller
 
 
 
+## 启动自定义 CRD 以及 Controller 的大概流程
+1. 首先入口处 NewManager, NewManager 内部大概就是 NewClient 以及 NewCache
+2. 其中 NewCache 大概就是 new 了一个 informer 的map，然后这个 map 以每个Kind，也就是每个 GVK 为 key，value 是它对应的 informer，每个 informer 都会创建一条 List Watch 和 Api Server 通信，监听对应的 Kind(GVK)
+3. NewClient 就是创建了一个用于和 Api Server 通信的客户端，其中读操作直接去 Cache 中去读，写的话会间接调用 k8s 提供的 go-client
+4. 在 ctrl.NewControllerManagedBy 之后总会调用 complete 方法
+5. complete 方法表示程序初始化完成已经开始监听资源了
+6. 内部大概逻辑是，doController 方法，初始化一个 Controller，
+这个 Controller 有 Cache 负责注册 Watch，Client 负责Kind 的 CUD 没有R，Queue 负责对 Watch 到的资源的事件做缓存，Recorder 负责事件收集，还有重要的 Do 这个就是自己写的那个 Reconcile 方法。
+7. 
