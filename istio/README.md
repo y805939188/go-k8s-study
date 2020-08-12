@@ -49,3 +49,17 @@
 1.5之后的版本，envoy加入了几个新功能，一个是加入了webassmebly插件，第二个是进出到envoy里面的流量的指标
 都会被envoy的一个新插件检测到，然后再发送给普罗米修斯进行遥测</br>
 ![istio5](./istio5.png)
+
+</br>
+</br>
+</br>
+</br>
+
+## istio 功能
+---
+### 流量控制
+  - 主要通过三个组件 Gateway、VirtualService、DestinationRule 来协作
+![istio6](./istio6.png)
+  1. Gateway: 负责接收流量转发给网格内部服务
+  2. VirtualService: 可以定义丰富的路由规则
+  3. DestinationRule: 定义流量进来之后，具体转发到那个service（或哪个pod）上
