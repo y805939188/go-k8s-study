@@ -9,7 +9,7 @@
 每个组件都被上面的控制中心管理</br>
 ![istio1](./istio1.png)
 
-### 架构图
+### 1.1架构图
 ![istio2](./istio2.png)
   1. 每个pod中都放了一个Proxy，这个Proxy是使用了c++开发的Envoy作为高性能的服务代理工具。
   2. Envoy提供了服务发现、负载均衡、流量管理等功能，以它作为pod中的sidecar。
@@ -34,3 +34,18 @@
     > * 为了保证安全，每个应用都需要实现一套相同的安全认证
     > * 限流机制，不能让任何人无限制地访问
 
+
+### 1.5架构图
+![istio3](./istio3.png)
+  1. 把原来的pilot、咖喱、citadel整合到了一个叫做 istiod 的服务中
+  2. 把 Mixer 给废了
+  3. 增加了 istioctl，可以更好地运维 istio 平台
+  4. 增加了 telemetry v2，替代 mixer 里的遥测能力
+  5. 增加了对虚拟机的支持
+
+
+1.5之前的版本，是mixer采集到service相应的数据之后在发给普罗米修斯</br>
+![istio4](./istio4.png)
+1.5之后的版本，envoy加入了几个新功能，一个是加入了webassmebly插件，第二个是进出到envoy里面的流量的指标
+都会被envoy的一个新插件检测到，然后再发送给普罗米修斯进行遥测</br>
+![istio5](./istio5.png)
