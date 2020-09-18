@@ -8,7 +8,7 @@
   1. [kubelet](https://github.com/y805939188/go-k8s-study/tree/master/kubelet/fake)
   2. [kubebuilder](https://github.com/y805939188/go-k8s-study/tree/master/kubebuilder)
   3. [k8s-RBAC](https://github.com/y805939188/go-k8s-study/tree/master/rbac)
-  4. [istion](https://github.com/y805939188/go-k8s-study/tree/master/istio)
+  4. [istio](https://github.com/y805939188/go-k8s-study/tree/master/istio)
   5. [蓝绿发布、金丝雀、AB Test](https://github.com/y805939188/go-k8s-study/tree/master/devops)
   6. [flagger-A/B Test](https://github.com/y805939188/go-k8s-study/tree/master/flagger)
 
